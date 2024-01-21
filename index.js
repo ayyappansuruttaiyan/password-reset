@@ -51,7 +51,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // routes
-app.post("/api/forgot-password", (req, res) => {
+app.post("/api/forgot-password", async (req, res) => {
   const { email } = req.body;
 
   // check if the user exists in the db
@@ -59,4 +59,46 @@ app.post("/api/forgot-password", (req, res) => {
   if (!user) {
     return res.status(400).send("User Not Found");
   }
+
+  // if user found , generate random string
+  const randomString = Math.random().toString(36).substring(7);
+
+  // store the random string in the db with the respective user
+  user.randomString = randomString;
+  await user.save();
+
+  // send mail with the random string for the particular user
+  const mailOptions = {
+    from: "mymail@gmail.com",
+    to: email,
+    subject: "Password Reset",
+    text: `Click the following link to reset your password: http://localhost:3000/api/reset-password/${randomString}`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      return res.status(500).send("Error sending mail");
+    }
+    res.status(200).send("Email sent. check your inbox");
+  });
+});
+
+app.get("api/reset-password/:randomString", async (req, res) => {
+  const { randomString } = req.body;
+
+  // check if the random string exists in the databse
+  const user = await User.findOne({ randomString });
+
+  if (!user) {
+    return res.status(404).send("Invalid Link");
+  }
+
+  // if the randomstring matches, display the password reset form
+  res.send(`
+  <form action="/reset-password/${randomString}" method="post">
+    <label for="newPassword">New Password:</label>
+    <input type="password" id="newPassword" name="newPassword" required>
+    <button type="submit">Reset Password</button>
+  </form>
+`);
 });
