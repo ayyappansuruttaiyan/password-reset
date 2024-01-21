@@ -2,9 +2,14 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
-
+const dotenv = require("dotenv");
+const ejs = require("ejs");
+const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Load environment variables
+dotenv.config();
 
 // middleware
 app.use(bodyParser.json());
@@ -19,6 +24,9 @@ mongoose
     console.log(error);
   });
 
+app.set("view engine", "ejs"); // Set EJS as the template engine
+app.set("views", path.join(__dirname, "views")); // Set the views directory
+
 // User schema
 const userSchema = mongoose.Schema({
   email: String,
@@ -30,10 +38,9 @@ const User = mongoose.model("User", userSchema);
 // Node Mailer setup
 const transporter = nodemailer.createTransport({
   service: "gmail",
-  secure: true,
   auth: {
-    user: "ayyappan.sjec@gmail.com",
-    pass: "",
+    user: process.env.USER_NAME,
+    pass: process.env.USER_PASSWORD,
   },
 });
 
@@ -56,21 +63,22 @@ app.post("/api/forgot-password", async (req, res) => {
 
   // send mail with the random string for the particular user
   const mailOptions = {
-    from: "mymail@gmail.com",
-    to: email,
+    from: "ayyappan.sjec@gmail.com",
+    to: "ayyappan.sjec@gmail.com",
     subject: "Password Reset",
     text: `Click the following link to reset your password: http://localhost:3000/api/reset-password/${randomString}`,
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
+      console.error("Error sending mail:", error);
       return res.status(500).send("Error sending mail");
     }
     res.status(200).send("Email sent. check your inbox");
   });
 });
 
-app.get("api/reset-password/:randomString", async (req, res) => {
+app.get("/api/reset-password/:randomString", async (req, res) => {
   const { randomString } = req.params;
 
   // check if the random string exists in the databse
@@ -92,7 +100,7 @@ app.get("api/reset-password/:randomString", async (req, res) => {
 
 app.post("/api/reset-password/:randomString", async (req, res) => {
   const { randomString } = req.params;
-  const { newPasword } = req.body;
+  const { newPassword } = req.body;
 
   // find the user by random string
   const user = await User.findOne({ randomString });
@@ -102,7 +110,7 @@ app.post("/api/reset-password/:randomString", async (req, res) => {
   }
 
   // if user matches store the new password and clear the random string in the db
-  user.newPasword = newPasword;
+  user.password = newPassword;
   user.randomString = null;
   await user.save();
   res.send("Password reset successfully");
