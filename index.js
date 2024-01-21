@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // middleware
 app.use(bodyParser.json());
@@ -12,25 +12,12 @@ app.use(bodyParser.json());
 //mongodb connection
 mongoose
   .connect("mongodb://localhost:27017/password-reset")
-  .then((response, error) => {
-    if (response) {
-      console.log("db connected successfully");
-    } else {
-      res.status(500).send().json({
-        type: false,
-        message: "something went wrong",
-      });
-      console.log("internal error");
-      console.error(error);
-    }
+  .then((response) => {
+    console.log("db connected successfully");
   })
   .catch((error) => {
     console.log(error);
   });
-//server
-app.listen(PORT, () => {
-  console.log(`Server is running on ${PORT}`);
-});
 
 // User schema
 const userSchema = mongoose.Schema({
@@ -55,7 +42,7 @@ app.post("/api/forgot-password", async (req, res) => {
   const { email } = req.body;
 
   // check if the user exists in the db
-  const user = User.findOne({ email });
+  const user = await User.findOne({ email });
   if (!user) {
     return res.status(400).send("User Not Found");
   }
@@ -84,7 +71,7 @@ app.post("/api/forgot-password", async (req, res) => {
 });
 
 app.get("api/reset-password/:randomString", async (req, res) => {
-  const { randomString } = req.body;
+  const { randomString } = req.params;
 
   // check if the random string exists in the databse
   const user = await User.findOne({ randomString });
@@ -101,4 +88,27 @@ app.get("api/reset-password/:randomString", async (req, res) => {
     <button type="submit">Reset Password</button>
   </form>
 `);
+});
+
+app.post("/api/reset-password/:randomString", async (req, res) => {
+  const { randomString } = req.params;
+  const { newPasword } = req.body;
+
+  // find the user by random string
+  const user = await User.findOne({ randomString });
+
+  if (!user) {
+    return res.status(404).send("Invalid link");
+  }
+
+  // if user matches store the new password and clear the random string in the db
+  user.newPasword = newPasword;
+  user.randomString = null;
+  await user.save();
+  res.send("Password reset successfully");
+});
+
+//server
+app.listen(PORT, () => {
+  console.log(`Server is running on ${PORT}`);
 });
