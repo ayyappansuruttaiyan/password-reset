@@ -95,9 +95,11 @@ app.post("/api/forgot-password", async (req, res) => {
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
       console.error("Error sending mail:", error);
-      return res.status(500).json({ message: "Error sending mail" });
+      res.status(500).json({ message: "Error sending mail" });
+      return;
     }
     res.status(200).json({ message: "Email sent. check your inbox" });
+    return;
   });
 });
 
@@ -112,12 +114,12 @@ app.get("/api/reset-password/:randomString", async (req, res) => {
   }
 
   const timeDifference = new Date() - user.resetStringTimestamp;
-  const timeLimit = 2 * 60 * 1000; // 2 minutes in milliseconds
+  const timeLimit = 1 * 60 * 1000; // 2 minutes in milliseconds
 
   if (timeDifference > timeLimit) {
     return res
       .status(400)
-      .json({ message: "Time Exceeded. Request a new link." });
+      .send(`<p>Time limit exceeded. Request a new link</p>`);
   }
   // if the randomstring matches, display the password reset form
   res.send(`
