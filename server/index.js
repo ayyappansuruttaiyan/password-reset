@@ -6,6 +6,7 @@ const dotenv = require("dotenv");
 const ejs = require("ejs");
 const path = require("path");
 const cors = require("cors");
+const Joi = require("joi");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,7 +19,7 @@ app.use(bodyParser.json());
 app.use(cors());
 //mongodb connection
 mongoose
-  .connect("mongodb://localhost:27017/password-reset")
+  .connect(process.env.MONGODB_URI_LOCAL || process.env.MONGODB_URI)
   .then((response) => {
     console.log("db connected successfully");
   })
@@ -31,9 +32,10 @@ app.set("views", path.join(__dirname, "views")); // Set the views directory
 
 // User schema
 const userSchema = mongoose.Schema({
-  email: String,
+  email: { type: String, required: true },
   randomString: String,
-  password: String,
+  password: { type: String, required: true },
+  resetStringTimestamp: Date,
 });
 const User = mongoose.model("User", userSchema);
 
@@ -49,9 +51,14 @@ const transporter = nodemailer.createTransport({
 // routes
 app.post("/api/register", async (req, res) => {
   const { email, randomString = "", password } = req.body;
-  const user = new User({ email, randomString, password });
+  const user = await User.findOne({ email });
+  if (user) {
+    res.status(400).json({ message: "User already exists" });
+    return;
+  }
+  const newUser = new User({ email, randomString, password });
   try {
-    await user.save();
+    await newUser.save();
     res.status(200).json({ message: "User registered successfully" });
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
@@ -63,23 +70,26 @@ app.post("/api/forgot-password", async (req, res) => {
 
   // check if the user exists in the db
   const user = await User.findOne({ email });
+  console.log(user);
   if (!user) {
-    return res.status(400).json({ message: "User Not Found" });
+    res.status(400).json({ message: "User Not Found" });
+    return;
   }
 
   // if user found , generate random string
   const randomString = Math.random().toString(36).substring(7);
-
-  // store the random string in the db with the respective user
+  const resetStringTimestamp = new Date(); // set the time when random string generated
+  // store the random string in the db with the respective user and time also
   user.randomString = randomString;
+  user.resetStringTimestamp = resetStringTimestamp;
   await user.save();
 
   // send mail with the random string for the particular user
   const mailOptions = {
     from: "ayyappan.sjec@gmail.com",
-    to: "ayyappan.sjec@gmail.com",
+    to: user.email,
     subject: "Password Reset",
-    text: `Click the following link to reset your password: http://localhost:3000/api/reset-password/${randomString}`,
+    text: `Click the following link to reset your password: http://localhost:5000/api/reset-password/${randomString}`,
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
@@ -101,6 +111,14 @@ app.get("/api/reset-password/:randomString", async (req, res) => {
     return res.status(404).json({ message: "Invalid Link" });
   }
 
+  const timeDifference = new Date() - user.resetStringTimestamp;
+  const timeLimit = 2 * 60 * 1000; // 2 minutes in milliseconds
+
+  if (timeDifference > timeLimit) {
+    return res
+      .status(400)
+      .json({ message: "Time Exceeded. Request a new link." });
+  }
   // if the randomstring matches, display the password reset form
   res.send(`
   <form action="/reset-password/${randomString}" method="post">
@@ -119,7 +137,8 @@ app.post("/api/reset-password/:randomString", async (req, res) => {
   const user = await User.findOne({ randomString });
 
   if (!user) {
-    return res.status(404).send("Invalid link");
+    res.status(404).send("Invalid link");
+    return;
   }
 
   // if user matches store the new password and clear the random string in the db
