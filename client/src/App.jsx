@@ -38,6 +38,7 @@ function ForgotPassword() {
         setTimeout(() => {
           console.log("Setting email to an empty string");
           setEmail("");
+          setMessage("");
         }, 10000);
       } else {
         setMessage("Unexpected response from the server");
