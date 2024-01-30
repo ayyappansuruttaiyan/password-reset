@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import Loader from "./Loader";
 import "./App.css";
 
 function App() {
@@ -21,13 +22,13 @@ function App() {
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
-
+  const [loading, setLoading] = useState(false);
   async function handleSubmit(e) {
     e.preventDefault();
-
+    setLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/forgot-password",
+        "https://password-reset-backend-tjdy.onrender.com/api/forgot-password",
         {
           email,
         }
@@ -51,6 +52,8 @@ function ForgotPassword() {
         // setEmail("");
         setMessage("");
       }, 5000);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -76,6 +79,7 @@ function ForgotPassword() {
             Reset Password
           </button>
         </form>
+        {loading && <Loader />}
         {message && <p>{message}</p>}
       </div>
     </div>
@@ -86,15 +90,19 @@ function RegisterUser() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   async function handleSubmit(e) {
     e.preventDefault();
-
+    setLoading(true);
     let response;
     try {
-      response = await axios.post("http://localhost:5000/api/register", {
-        email,
-        password,
-      });
+      response = await axios.post(
+        "https://password-reset-backend-tjdy.onrender.com/api/register",
+        {
+          email,
+          password,
+        }
+      );
       if (response && response.data && response.data.message) {
         setMessage(response.data.message);
         setEmail("");
@@ -111,6 +119,8 @@ function RegisterUser() {
 
       setEmail("");
       setPassword("");
+    } finally {
+      setLoading(false);
     }
   }
   return (
@@ -148,7 +158,8 @@ function RegisterUser() {
           Sign Up Now
         </button>
       </form>
-      {message && <p className="btn">{message}</p>}
+      {loading && <Loader />}
+      {message && <p className="infor">{message}</p>}
     </div>
   );
 }
